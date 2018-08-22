@@ -31,7 +31,10 @@ def text_to_list(file_name):
     return filter_options
 
 
-def filter_sheet(workbook_r, name, func_arg, exonic_func_arg, ref_dbs):
+
+
+
+def filter_sheet(workbook_r, name, func_arg, exonic_func_arg, ref_dbs):        
     '''A function that takes an xl-sheet
     as input and filters it according to the users specifications
     on Func.refGene (=func), ExonicFunc.refGene (=exonic_func),
@@ -57,17 +60,19 @@ def filter_sheet(workbook_r, name, func_arg, exonic_func_arg, ref_dbs):
             func = xl_sheet.cell(row_idx, 4).value.encode('ascii','ignore') #filter on Func.refGene (that is exonic, intronic, splicing etc)
             exonic_func = xl_sheet.cell(row_idx, 5).value.encode('ascii','ignore') #filter on ExonicFunc.refGene (that is frameshift_deletion/insertion, synonymous_SNV etc)
             if func not in func_arg and exonic_func not in exonic_func_arg:
+                count_match = 0 #To keep track of how many db fulfill the criteria
                 for ref_db in ref_dbs:
                     ref_db = ref_db.split(' ') #split each list item on space
                     MAF = xl_sheet.cell(row_idx, int(ref_db[1])).value.encode('ascii','ignore') #filter on reference databases MAFs
                     if MAF and MAF != '.': #Checks if MAF is empty or NA
                         MAF = float(MAF)
                         if(MAF >= float(ref_db[3]) or MAF <= float(ref_db[2])): #Filtering on MAF
-                            row_n += 1
-                            write_to_sheet(row_idx, sheet_w, xl_sheet, row_n)
+                            count_match+=1
                     else:
-                        row_n += 1
-                        write_to_sheet(row_idx, sheet_w, xl_sheet, row_n)                        
+                        count_match+=1
+                if count_match == len(ref_dbs):
+                    row_n += 1
+                    write_to_sheet(row_idx, sheet_w, xl_sheet, row_n)
                     
             else:
                 continue
@@ -108,7 +113,6 @@ else:
     func_arg = text_to_list(sys.argv[2])
     exonic_func_arg = text_to_list(sys.argv[3])
     ref_dbs = text_to_list(sys.argv[4])
-    print ref_dbs
 
     #Perform the filtering
 
