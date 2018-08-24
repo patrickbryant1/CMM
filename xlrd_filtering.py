@@ -1,4 +1,5 @@
 #! /usr/bin/env python
+# -*- coding: utf-8 -*-
 
 '''
 This is a program that takes an xl workbook, reads it and uses its
@@ -30,23 +31,39 @@ def text_to_list(file_name):
             
     return filter_options
  
-def haplotype_bool(haplotype_positions):
-    '''A function that takes a list of haplotype positions
+def zygosity_match(zygosity_positions, xl_sheet, row_idx):
+    '''A function that takes a list of zygosity positions
     and sorts out which to match based on booleans. Those with ones
     are to be matched, the rest may differ.
-    Input: list of haplotype positions
+    Input: list of zygosity  positions
     Output: lists of positions to match/not
     '''
-    match_pos = [] #List to store positions to match
-    no_match_pos = [] #List to store positions not to match
+    column_pos = [] #List to store colummn positions
+    right_zyg = False    
     
-    for haplotype in haplotype_positions:
-        haplotype = haplotype.split(' ')
-        if haplotype[2] == '1': #If the boolean is 1, the haplotype at that position should match
-            match_pos.append(haplotype[1])
-        else:
-            no_match_pos.append(haplotype[1])
-    return match_pos, no_match_pos
+   
+    for item in zygosity_positions:
+        item = item.split(' ') #split on space
+        column_pos.append(item[1])  #get column position
+
+    match_count = 0 #To keep track of how many matches have been made
+    x = len(zygosity_positions[0].split(' ')) #To keep track of last column
+    #Match zygosities
+    for i in range(2, x): #Go through all zygosity combinations
+        j = 0 #go through all items
+        match_count = 0
+        for pos in column_pos:
+            match = encode_ascii(xl_sheet, row_idx, int(pos)) #zygosity to match
+            item = zygosity_positions[j].split(' ')
+            zygosity = item[i]
+            if match == zygosity:
+                match_count +=1
+            j+=1
+        if match_count == len(column_pos): #Check if all columns have been matched
+            right_zyg = True
+            break
+
+    return right_zyg
 
 def encode_ascii(xl_sheet, row_idx, col_idx):
     '''A function that encodes and retrieves excel cell values
@@ -56,31 +73,9 @@ def encode_ascii(xl_sheet, row_idx, col_idx):
     cell_value = xl_sheet.cell(row_idx, col_idx).value.encode('ascii','ignore')
 
     return cell_value
-
-def haplotype_match(xl_sheet, match_pos, no_match_pos, row_idx):
-    '''A function that compares the haplotypes according
-    to the lists match_pos and no_match_pos.
-    Input:
-    Output:
-    '''
-    match = encode_ascii(xl_sheet, row_idx, int(match_pos[0])) #Cell to match
-    fulfilled_criteria = True #To see if all criteria are fulfilled
-    for pos_1 in match_pos:
-        if encode_ascii(xl_sheet, row_idx, int(pos_1)) == match:
-            for pos_2 in no_match_pos:
-                if encode_ascii(xl_sheet, row_idx, int(pos_2)) != match:
-                    continue
-                else:
-                    fulfilled_criteria = False
-                    break
-        else:
-            fulfilled_criteria = False
-            break
-    #pdb.set_trace()
-    return fulfilled_criteria
     
 
-def filter_sheet(workbook_r, name, func_arg, exonic_func_arg, ref_dbs, match_pos, no_match_pos):        
+def filter_sheet(workbook_r, name, func_arg, exonic_func_arg, ref_dbs, zygosity_positions):        
     '''A function that takes an xl-sheet
     as input and filters it according to the users specifications
     on Func.refGene (=func), ExonicFunc.refGene (=exonic_func),
@@ -105,8 +100,8 @@ def filter_sheet(workbook_r, name, func_arg, exonic_func_arg, ref_dbs, match_pos
         for row_idx in range(1, xl_sheet.nrows):
             func = encode_ascii(xl_sheet, row_idx, 4) #filter on Func.refGene (that is exonic, intronic, splicing etc)
             exonic_func = encode_ascii(xl_sheet, row_idx, 5) #filter on ExonicFunc.refGene (that is frameshift_deletion/insertion, synonymous_SNV etc)
-            fulfilled_criteria = haplotype_match(xl_sheet, match_pos, no_match_pos, row_idx)
-            if func not in func_arg and exonic_func not in exonic_func_arg and fulfilled_criteria == True:
+            right_zyg = zygosity_match(zygosity_positions, xl_sheet, row_idx) #Compare zygosities between individuals
+            if func not in func_arg and exonic_func not in exonic_func_arg and right_zyg == True:
                 count_match = 0 #To keep track of how many db fulfill the criteria
                 for ref_db in ref_dbs:
                     ref_db = ref_db.split(' ') #split each list item on space
@@ -160,14 +155,13 @@ else:
     func_arg = text_to_list(sys.argv[2])
     exonic_func_arg = text_to_list(sys.argv[3])
     ref_dbs = text_to_list(sys.argv[4])
-    haplotype_positions = text_to_list(sys.argv[5])
-    #Split haplotype positions to see which should match
-    (match_pos, no_match_pos) = haplotype_bool(haplotype_positions)
+    zygosity_positions = text_to_list(sys.argv[5])
+    
     #Perform the filtering
 
     name = str(sys.argv[1]).split('/')[-1:] #name is only the last part of path
                                             #name is a list here
-    filter_sheet(workbook_r, name, func_arg, exonic_func_arg, ref_dbs, match_pos, no_match_pos)
+    filter_sheet(workbook_r, name, func_arg, exonic_func_arg, ref_dbs, zygosity_positions)
 
 
     
