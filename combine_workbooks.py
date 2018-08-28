@@ -19,7 +19,7 @@ import glob
 
 #Functions
 
-def merge_sheets(directory_path):
+def combine_sheets(directory_path):
     '''A functions that takes the path to a directory
     containing .xlsx workbooks and writes the information
     on the first sheets in them to a single sheet in a new
@@ -87,7 +87,7 @@ except IOError:
     print 'No direcory path.'
 
 try:
-    merge_sheets(directory_path)
+    combine_sheets(directory_path)
 except IOError:
     print 'Could not merge sheets'
 
