@@ -86,11 +86,12 @@ def filter_sheet(workbook_r, name, func_arg, exonic_func_arg, ref_dbs, zygosity_
     
     #Create an excel workbook and a sheet to write to
     workbook_w = xlwt.Workbook()
+    right_zyg = True
 
     for num in range(0, 1):#workbook_r.nsheets):
         xl_sheet = workbook_r.sheet_by_index(num) #Open sheet_num
         sheet_w = workbook_w.add_sheet('Sheet_'+str(num+1)) #Create sheet_num into workbook_w
-
+	
         row_idx = 0 #Row to transfer from
         row_n = 0 #To keep track of which row to write to
         #transfer first row
@@ -100,7 +101,10 @@ def filter_sheet(workbook_r, name, func_arg, exonic_func_arg, ref_dbs, zygosity_
         for row_idx in range(1, xl_sheet.nrows):
             func = encode_ascii(xl_sheet, row_idx, 4) #filter on Func.refGene (that is exonic, intronic, splicing etc)
             exonic_func = encode_ascii(xl_sheet, row_idx, 5) #filter on ExonicFunc.refGene (that is frameshift_deletion/insertion, synonymous_SNV etc)
-            right_zyg = zygosity_match(zygosity_positions, xl_sheet, row_idx) #Compare zygosities between individuals
+            
+            if zygosity_positions: #If there are zygosities to filter on
+                right_zyg = zygosity_match(zygosity_positions, xl_sheet, row_idx) #Compare zygosities between individuals
+                
             if func not in func_arg and exonic_func not in exonic_func_arg and right_zyg == True:
                 count_match = 0 #To keep track of how many db fulfill the criteria
                 for ref_db in ref_dbs:
@@ -158,7 +162,6 @@ else:
     zygosity_positions = text_to_list(sys.argv[5])
     
     #Perform the filtering
-
     name = str(sys.argv[1]).split('/')[-1:] #name is only the last part of path
                                             #name is a list here
     filter_sheet(workbook_r, name, func_arg, exonic_func_arg, ref_dbs, zygosity_positions)
