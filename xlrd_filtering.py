@@ -30,13 +30,14 @@ def text_to_list(file_name):
             filter_options.append(line)
             
     return filter_options
+
+
  
 def zygosity_match(zygosity_positions, xl_sheet, row_idx):
     '''A function that takes a list of zygosity positions
-    and sorts out which to match based on booleans. Those with ones
-    are to be matched, the rest may differ.
-    Input: list of zygosity  positions
-    Output: lists of positions to match/not
+    and specified zygosity combinations and matches them.
+    Input: list of zygosity  positions and combinations
+    Output: riht_zyg = True/False, match or no_match
     '''
     column_pos = [] #List to store colummn positions
     right_zyg = False    
@@ -70,8 +71,7 @@ def encode_ascii(xl_sheet, row_idx, col_idx):
     Input: row and column positions
     Output: cell_value
     '''
-    cell_value = xl_sheet.cell(row_idx, col_idx).value.encode('ascii','ignore')
-
+    cell_value = str(xl_sheet.cell(row_idx, col_idx).value).encode('ascii','ignore')
     return cell_value
     
 
@@ -111,7 +111,7 @@ def filter_sheet(workbook_r, name, func_arg, exonic_func_arg, ref_dbs, zygosity_
                         if(MAF >= float(ref_db[3]) or MAF <= float(ref_db[2])): #Filtering on MAF
                             count_match+=1
                     else:
-                        count_match+=1
+                        count_match+=1 #If there is no MAF, it is important to keep
                 if count_match == len(ref_dbs):
                     row_n += 1
                     write_to_sheet(row_idx, sheet_w, xl_sheet, row_n)
