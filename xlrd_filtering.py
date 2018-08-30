@@ -134,7 +134,9 @@ def write_to_sheet(row_idx, sheet_w, xl_sheet, row_n):
 
     #Iterate over all columns
     for col_idx in range(0, xl_sheet.ncols):
-        cell = str(xl_sheet.cell(row_idx, col_idx).value)
+        cell = xl_sheet.cell(row_idx, col_idx).value
+        if type(cell) == float:
+        	cell = str(cell)
         cell = cell.encode('ascii','ignore')
         sheet_w.write(row_n, col_idx, cell)
 
