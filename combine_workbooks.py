@@ -70,7 +70,9 @@ def write_to_sheet(row_r, row_w, sheet_w, sheet_r):
     
     #Iterate over all columns
     for col_idx in range(0, sheet_r.ncols):
-        sheet_r_cell = str(sheet_r.cell(row_r, col_idx).value)
+        sheet_r_cell = sheet_r.cell(row_r, col_idx).value
+	if type(sheet_r_cell) == float:
+		sheet_r_cell = str(sheet_r_cell)
         sheet_r_cell = sheet_r_cell.encode('ascii','ignore')
         sheet_w.write(row_w, col_idx, sheet_r_cell)
         col_n += 1
