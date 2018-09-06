@@ -14,6 +14,8 @@ parser.add_argument('infile', nargs=1, type= str,
                   default=sys.stdin, help = '''path to file with a list of newline
                     separated genes to be opened''')
 
+# *Always* tell NCBI who you are
+Entrez.email = "patrick.bryant@ki.se"
 
 def text_to_list(file_name):
     '''A function that reads a text file and creates a list of its rows.
@@ -31,10 +33,10 @@ def text_to_list(file_name):
     
 
 #Get info on db parameters
-##data = Entrez.read(Entrez.einfo(db="pubmed"))
-##for field in data["DbInfo"]["FieldList"] :
-##    print "%(Name)s, %(FullName)s, %(Description)s" % field
-#TIAB = Title/Abstract, Free text associated with Abstract/Title
+#data = Entrez.read(Entrez.einfo(db="pubmed"))
+#for field in data["DbInfo"]["FieldList"] :
+#    print "%(Name)s, %(FullName)s, %(Description)s" % field
+
 
 
 def gene_search(gene_list, dbs):
@@ -43,28 +45,48 @@ def gene_search(gene_list, dbs):
     input = gene_list(list),dbs(dict)
     output = none
     '''
-    # *Always* tell NCBI who you are
-    Entrez.email = "patrick.bryant@ki.se"
+    
     
     for single_term in gene_list:
         for key in dbs:
-            handle = Entrez.esearch(db=key,term = single_term)
+	    handle = Entrez.esearch(db=key,term = single_term)
+
             record = Entrez.read(handle)
             ids = record['IdList']
+            
+            #Print the found info
             print 'Search term:', single_term
             print 'Database', key
             print 'Number of search results:', len(ids)
-            print 'Number of search results displayed:', dbs[key]
-            for seq_id in ids[0:dbs[key]]:
-                handle.close()
-                handle = Entrez.efetch(db=key, id=seq_id, rettype="TIAB", retmode="text")
-                record = handle.read()
-                print record
-                handle.close()
-            
-    print '*'*80 #Separator
+            n_disp = dbs[key] #Reset n_disp
+            if len(ids)<dbs[key]: #If there are less results than wanted
+            	n_disp = len(ids)
 
-dbs = {'gene':1, 'pubmed':3} #Dict with db to search and number of results to display.
+            print 'Number of search results displayed:', abs(n_disp)
+
+            
+            for article_id in ids[0:dbs[key]]:
+                handle.close() #Close handle before creating a new one
+                found = True
+                handle = Entrez.efetch(db=key, id=article_id, rettype="TIAB", retmode="text") #TIAB = Title/Abstract, Free text associated with Abstract/Title
+                record = handle.read()
+
+                if key == 'Gene':
+                    if single_term in record and 'human' in record: #If the wanted term is found in the returned record
+                        print record
+                        break
+               	    
+               	if key == 'pubmed':
+                    print record
+
+                handle.close()
+    	print '*'*80, '\n','*'*80 #Separator
+
+dbs = {'Gene':-1, 'pubmed':3} #Dict with db to search and number of results to display.
+
+def fetch_record(record, single_term):
+	'''
+	'''
 
 
 #Main program
@@ -73,5 +95,4 @@ dbs = {'gene':1, 'pubmed':3} #Dict with db to search and number of results to di
 #gene_list = ['MSH3']
 args = parser.parse_args()
 gene_list = text_to_list(args.infile[0])
-pdb.set_trace()
 gene_search(gene_list, dbs)#Search
