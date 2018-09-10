@@ -49,8 +49,8 @@ def gene_search(gene_list, dbs):
     
     for single_term in gene_list:
         for key in dbs:
+            #Fetch ids
 	    handle = Entrez.esearch(db=key,term = single_term)
-
             record = Entrez.read(handle)
             ids = record['IdList']
             
@@ -63,30 +63,21 @@ def gene_search(gene_list, dbs):
             	n_disp = len(ids)
 
             print 'Number of search results displayed:', abs(n_disp)
+            handle.close() #Close handle before creating a new one
 
-            
+            #Fetch article TIABs
             for article_id in ids[0:dbs[key]]:
-                handle.close() #Close handle before creating a new one
-                found = True
                 handle = Entrez.efetch(db=key, id=article_id, rettype="TIAB", retmode="text") #TIAB = Title/Abstract, Free text associated with Abstract/Title
                 record = handle.read()
 
-                if key == 'Gene':
-                    if single_term in record and 'human' in record: #If the wanted term is found in the returned record
-                        print record
-                        break
-               	    
-               	if key == 'pubmed':
-                    print record
+                print record
 
                 handle.close()
     	print '*'*80, '\n','*'*80 #Separator
 
-dbs = {'Gene':-1, 'pubmed':3} #Dict with db to search and number of results to display.
+dbs = {'pubmed':3} #Dict with db to search and number of results to display.
 
-def fetch_record(record, single_term):
-	'''
-	'''
+
 
 
 #Main program
