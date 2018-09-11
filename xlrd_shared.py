@@ -45,38 +45,71 @@ def find_shared(zygosity_positions, xl_sheet, row_idx, above_t):
         Output = shared (bool)
     '''
     
-    column_pos = [] #List to store colummn positions
+    share_pos = [] #List to store colummn positions for those that should share
+    not_share_pos = [] #List to store colummn positions for those that should not share
     shared = True #See if the variants are shared
-   
+
+    #Get positions for zygosities
     for item in zygosity_positions:
         item = item.split(' ') #split on space
-        column_pos.append(item[1])  #get column position
+        if item[2] == '1':
+            share_pos.append(item[1])  #get column position
+        else:
+            not_share_pos.append(item[1])
 
     wt = False #Keep track of wt
     hom = False #Keep track of hom
-    for pos in column_pos:
+    other = False #Keeep track of other
+    count = 0 #To keep track of how many oth
+    for pos in share_pos:
         zyg = encode_ascii(xl_sheet, row_idx, int(pos)) #zygosity to match
-
-
-        if zyg == "wt" or zyg == "hom" or zyg == "het": #If the variants are not het/hom/wt they cannot be assessed
-            if zyg == "wt":
+        if zyg =='.':  #If the zygosity cannot be assessed, it is disregarded
+            shared = False            
+            break   
+        else:
+            if zyg == "wt" or not zyg: #If the zyg is empty, it is wt
                 wt = True
             if zyg == "hom":
                 hom = True
-                
-        else:            
-            break
-       
-    
-    
-    if wt == True and hom == True:
+            if zyg == "het":
+                continue
+            if zyg == 'oth':
+                other = True
+                count+=1 #Keep track of how many oth
+        
+    if count != len(share_pos) and other == True: #If all that should share are not oth
+        shared = False
+    if wt == True and hom == True: #If both hom and wt is true, the variant is not shared
         shared = False
     if wt == True and above_t == False: #If the variant is wt, the MAF should be above the threshold
-    	shared = False
+        shared = False
     if hom == True and above_t == True: #If the variant is hom, the MAF should be below the threshold
         shared = False
 
-    print hom, wt, above_t, shared
+    if shared == True and not_share_pos:
+        shared = not_shared(not_share_pos, wt, hom, other, shared, above_t, xl_sheet, row_idx)
+
+    return(shared)
+            
+def not_shared(not_share_pos, wt, hom, other, shared, above_t, xl_sheet, row_idx):
+    #Check the ones that should not share
+    for pos in not_share_pos:
+        zyg = encode_ascii(xl_sheet, row_idx, int(pos)) #zygosity to match
+        if zyg =='.': #If the zygosity cannot be assessed, it is disregarded
+            shared = False
+            break
+        else:
+            if zyg == 'het': #If the zygosity is het, they will share
+                shared = False
+            if zyg == "wt" or not zyg: #If the zyg is empty it is wt
+                if wt == True or above_t == True: #If the variant is wt, the MAF should be below the threshold
+                    shared = False
+            if zyg == "hom": #If the variant is hom, the MAF should be above the threshold
+                if hom == True or above_t == False:
+                    shared = False 
+            if other == True and zyg =='oth':
+                shared = False
+                
     return(shared)
 
 def filter_sheet(workbook_r, name, ref_dbs, zygosity_positions):        
@@ -113,13 +146,14 @@ def filter_sheet(workbook_r, name, ref_dbs, zygosity_positions):
             
             shared = find_shared(zygosity_positions, xl_sheet, row_idx, above_t)
             if shared == True:
+                
                     row_n += 1
                     write_to_sheet(row_idx, sheet_w, xl_sheet, row_n)
                     
             else:
                 continue
 
-    workbook_w.save('filtered_'+name[0])
+    workbook_w.save('shared_'+name[0])
 
     return None
 
