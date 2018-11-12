@@ -6,10 +6,12 @@ import sys
 import os
 import pdb
 import xlrd
-import xlwt
 import argparse
 import openpyxl 
-
+from mpl_toolkits.mplot3d import Axes3D
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib import cm
 
 #Arguments for argparse module:
 parser = argparse.ArgumentParser(description = '''A program that reads a file
@@ -61,8 +63,7 @@ def hap_map(workbook_r, name, instructions):
    
     for num in range(0, 1):#The first sheet, could have more
         sheet_r = workbook_r.sheet_by_index(num) #Open sheet_num, the one to read
-        
-	hap_lens = [] #List with haplotype lengths
+        hap_lens = [] #List with haplotype lengths
         hap_lists = [] #List to store haplotype lists
         pos_to_rs = [] #Connect rs to pos
 
@@ -139,13 +140,14 @@ def write_headers(sheet_w):
     '''A function that writes the headers to the
     workbook
     '''
-    sheet_w.cell(row=5,column=1).value = 'Position' 
-    sheet_w.cell(row=5,column=2).value = 'SNP1'
+    sheet_w.cell(row=6,column=1).value = 'Position' 
+    sheet_w.cell(row=6,column=2).value = 'SNP1'
 
     write_vertical('P-value', 1, 2, sheet_w)
-    write_vertical('OR', 2, 2, sheet_w)
-    write_vertical('F', 3, 2, sheet_w)
-    write_vertical('SNP2', 4, 2, sheet_w)
+    write_vertical('P-rank', 2, 2, sheet_w)
+    write_vertical('OR', 3, 2, sheet_w)
+    write_vertical('F', 4, 2, sheet_w)
+    write_vertical('SNP2', 5, 2, sheet_w)
 
     return None
 
@@ -171,11 +173,11 @@ def write_rs(pos_to_rs, sheet_w):
         item = pos_to_rs[i]
         cell = str(item[0]).encode('ascii','ignore')
         #sheet_w.write(i,0, cell) #Row i, column 0
-        sheet_w.cell(row=i+6,column=1).value = cell #Row i, column 1
+        sheet_w.cell(row=i+7,column=1).value = cell #Row i, column 1
         #Write rs
         cell = str(item[1]).encode('ascii','ignore')
-        sheet_w.cell(row=i+6,column=2).value = cell #Row i, column 2        
-        pos_to_rs[i] = pos_to_rs[i] + (str(i+6),) #Add index to rs
+        sheet_w.cell(row=i+7,column=2).value = cell #Row i, column 2        
+        pos_to_rs[i] = pos_to_rs[i] + (str(i+7),) #Add index to rs
 
     return pos_to_rs
         
@@ -191,26 +193,44 @@ def get_hap_len(item):
 
 def get_start(item):
     '''A function that splits item on / and
-    returns the haplotype length for sorting
+    returns the SNP start pos for sorting
     Input = item (list of lists)
-    Output = length (int)
+    Output = start (float)
     '''
     
-    length = float((item.split('/')[0]))
-    return length
+    start = float((item.split('/')[0]))
+    return start
      
-    
+def p_sort(item):
+   '''A function that splits item on / and
+    returns the haplotype length for sorting
+    Input = item (list of lists)
+    Output = p_val
+    '''
+   p = float((item.split('/')[4]))
+   return p
+
+
+
 def transpose(hap_lists, sheet_w, hap_lens, pos_to_rs):
     '''A function that writes data into a sheet in the excel workbook.
     Input: hap_dicts, sheet_w
     Output: None
     '''
+    #For surface plot
+    X = []
+    Y = []
+    Z = []
     
     #Sort hap_lists on haplotype length
     hap_lists = sorted(hap_lists, key = get_hap_len)
     #Sort the contents of each hap_list on position
     for i in range(0, len(hap_lists)): #Remember to do a range when changing lists!
-        hap_lists[i] = sorted(hap_lists[i], key = get_start)
+        hap_lists[i] = sorted(hap_lists[i], key = p_sort)#Sort on p-val and assign rank
+        for j in range(0,len(hap_lists[i])):
+            hap_lists[i][j]+='/'+str(float(j)+1)
+        
+        hap_lists[i] = sorted(hap_lists[i], key = get_start)#Sort on position of first SNP
 
     #When you print out the haps you want the ones of equal size in positional order
     col_idx = 2 #Keep track of column number
@@ -223,13 +243,17 @@ def transpose(hap_lists, sheet_w, hap_lens, pos_to_rs):
             p_val = item[4]
             F = item[5]
             OR = item[6]
+            p_rank = item[7]
 
             for pr in pos_to_rs:
                 if rs_1 == pr[1]: #Match on rs
                     row_idx = int(pr[2])
                     col_idx += 1 #Write to next column
-                    write_haps(haplotype, rs_1, rs_2, p_val, F, OR, row_idx, col_idx, sheet_w)
+                    (X, Y, Z) = write_haps(haplotype, rs_1, rs_2, p_val, p_rank, F, OR, row_idx, col_idx, sheet_w, X, Y, Z)
                     break
+                
+                
+    surface_plot(X,Y,Z)
     return None
 
 def write_vertical(item, i, j, sheet_w):
@@ -242,31 +266,49 @@ def write_vertical(item, i, j, sheet_w):
 
     return None
 
-def write_haps(haplotype,rs_1, rs_2, p_val, F, OR, row_idx, col_idx, sheet_w):
+def write_haps(haplotype,rs_1, rs_2, p_val, p_rank, F, OR, row_idx, col_idx, sheet_w, X, Y, Z):
     '''A function that writes the haplotype into an excel
     spread sheet.
     Input =
     Output = None
     '''
-
+    
     #Write p-val
     write_vertical(p_val, 1, col_idx, sheet_w)
+    #Write p-val rank
+    write_vertical(p_rank, 2, col_idx, sheet_w)
     #Write OR
-    write_vertical(OR, 2, col_idx, sheet_w)
+    write_vertical(OR, 3, col_idx, sheet_w)
     #Write F
-    write_vertical(F, 3, col_idx, sheet_w)
+    write_vertical(F, 4, col_idx, sheet_w)
     #Write rs_2
-    write_vertical(rs_2, 4, col_idx, sheet_w)
+    write_vertical(rs_2, 5, col_idx, sheet_w)
     #Write rs_1
-    write_vertical(rs_1, 5, col_idx, sheet_w)
-
+    write_vertical(rs_1, 6, col_idx, sheet_w)
+    
     for base in haplotype:
+        X.append(row_idx)
+        Y.append(col_idx)
+        Z.append(1/float(p_val))
         cell = base.encode('ascii','ignore')
         sheet_w.cell(row=row_idx,column=col_idx).value = cell
         row_idx +=1
 
-    return None
-                
+    return X, Y, Z
+
+def surface_plot(X,Y,Z):
+    #Convert to numpy arrays
+    X = np.array(X)
+    Y = np.array(Y)
+    Z = np.array(Z)
+    # Plot the surface.
+    fig = plt.figure()
+    
+    #ax = fig.gca(projection='3d')
+    ax = Axes3D(fig)
+    surf = ax.plot_trisurf(X, Y, Z, cmap=cm.coolwarm, linewidth=0, antialiased=False)
+    fig.colorbar(surf, shrink=0.5, aspect=5)
+    plt.show()
 #Main program
      
 args = parser.parse_args()
@@ -277,9 +319,9 @@ try:
     
     #Checks if file is empty
     if os.stat(args.hap_file[0]).st_size == 0:
-       print "Empty file."       
+       print ("Empty file.")       
 except IOError:
-    print 'Cannot open', args.hap_file[0]
+    print ('Cannot open', args.hap_file[0])
 else:
     #Get criteria for output
     instructions = text_to_list(args.instructions[0])
