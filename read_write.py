@@ -6,10 +6,8 @@ Created on Tue Nov 20 14:31:06 2018
 @author: patbry
 """
 
-import xlrd
 import openpyxl
-
-
+import pdb
 
 def text_to_list(file_name):
     '''A function that reads a text file and creates a list of its rows.
@@ -44,7 +42,20 @@ def write_to_sheet(row_idx, sheet_w, sheet_r, row_n):
         cell = sheet_r.cell(row_idx, col_idx).value
         if type(cell) == float:
             	cell = str(cell) 
+
         cell = cell.encode('ascii','ignore')
-        sheet_w.cell(row = row_n, column = col_idx+1).value = cell #Openpyxl is not zero indexed, but xlrd is
+        sheet_w.cell(row = row_n, column = col_idx+1).value = cell #Openpyxl is not zero indexed, but xlrd is not
 
     return None
+
+def fill(sheet_w, row_n, row_idx, col_idx, color_code):
+    '''Fill cell with color according to color_code
+    Output = None
+    '''
+
+    color = openpyxl.styles.colors.Color(rgb=color_code)
+    my_fill = openpyxl.styles.fills.PatternFill(patternType='solid', fgColor=color)
+    sheet_w.cell(row = row_n, column = col_idx+1).fill = my_fill
+
+
+
