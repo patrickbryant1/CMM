@@ -1,6 +1,17 @@
 #! /usr/bin/env python
 
-'''
+import sys
+import os
+import pdb
+import xlrd
+import openpyxl
+import glob
+import argparse
+from read_write import encode_ascii, write_to_sheet
+
+
+#Arguments for argparse module:
+parser = argparse.ArgumentParser(description = '''
 This is a program that combines the first sheets in excel workbooks from a certain directory into one.
 
 Two arguments: python code, directory with workbooks to combine
@@ -8,14 +19,10 @@ Two arguments: python code, directory with workbooks to combine
 Note! Remember that one cannot write too many rows to an excel sheet (there
 is a limit). 
 '''
-
-import sys
-import os
-import pdb
-import xlrd
-import xlwt
-import glob
-
+)
+ 
+parser.add_argument('directory_path', nargs=1, type= str,
+                  default=sys.stdin, help = 'path to directory containing excel files to be combined')
 
 #Functions
 
@@ -28,14 +35,14 @@ def combine_sheets(directory_path):
     Output: None
     '''
 
-    row_w = 0 #To keep track of which row to write to
+    row_w = 1 #To keep track of which row to write to
     row_r = 0 #To keep track of which row to rad from
     headers = False #Keep track of if headers have been written
     
     #Create an excel workbook and a sheet to write to
-    workbook_w = xlwt.Workbook()
-    sheet_w = workbook_w.add_sheet('All_chr')
-    
+    workbook_w = openpyxl.Workbook()
+    sheet_w = workbook_w.active #Get active sheet
+    sheet_w.title = 'All_chr'   
     
 
     #Write over the first row of the first sheet in the first workbook 
@@ -48,42 +55,24 @@ def combine_sheets(directory_path):
         workbook_r = xlrd.open_workbook(filename)
         sheet_r=workbook_r.sheet_by_index(0)
         if headers == False:
-            write_to_sheet(row_r, row_w, sheet_w, sheet_r)
+            write_to_sheet(row_r, sheet_w, sheet_r, row_w)
             headers = True
             
         for row_r in range(1, sheet_r.nrows): #Iterate through all rows but the first
             row_w +=1 #Write to the next row
-            write_to_sheet(row_r, row_w, sheet_w, sheet_r)
+            write_to_sheet(row_r, sheet_w, sheet_r, row_w)
                     
 
     workbook_w.save('summary.xlsx')
 
     return None
-
-def write_to_sheet(row_r, row_w, sheet_w, sheet_r):
-    '''A function that writes data into a sheet in an excel workbook.
-    Input: row_r, row_w, sheet_w, sheet_r
-    Output: None
-    '''
-
-    col_n = 0 #To keep track of which column to write to
-    
-    #Iterate over all columns
-    for col_idx in range(0, sheet_r.ncols):
-        sheet_r_cell = sheet_r.cell(row_r, col_idx).value
-	if type(sheet_r_cell) == float:
-		sheet_r_cell = str(sheet_r_cell)
-        sheet_r_cell = sheet_r_cell.encode('ascii','ignore')
-        sheet_w.write(row_w, col_idx, sheet_r_cell)
-        col_n += 1
-        
-      
-    return None
                 
 #Main program
+args = parser.parse_args()
 
 try:
-    directory_path = sys.argv[1]
+    directory_path = args.directory_path[0]
+
 
 except IOError:
     print 'No direcory path.'
@@ -91,7 +80,7 @@ except IOError:
 try:
     combine_sheets(directory_path)
 except IOError:
-    print 'Could not merge sheets'
+    print 'Could not combine sheets'
 
 
 
