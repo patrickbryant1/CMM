@@ -37,6 +37,9 @@ parser.add_argument('zygosity_positions', nargs=1, type= str,
                   default=sys.stdin, help = '''path to text file containing
                   zygosity_positions to filter on.''')
 
+parser.add_argument('out_name', nargs=1, type= str,
+                  default=sys.stdin, help = '''str containing requested name of output file''')
+
 ###########################################################################################
 #Functions
 
@@ -73,6 +76,7 @@ def find_shared(zygosity_positions, xl_sheet, row_idx, above_t):
     shared = True #See if the variants are shared
 
     #Get positions for zygosities
+    #Unnecessary to do this every time
     for item in zygosity_positions:
         item = item.split(' ') #split on space
         if item[2] == '1':
@@ -83,7 +87,7 @@ def find_shared(zygosity_positions, xl_sheet, row_idx, above_t):
     wt = False #Keep track of wt
     hom = False #Keep track of hom
     other = False #Keeep track of other
-    count = 0 #To keep track of how many oth
+   
     for pos in share_pos:
         zyg = encode_ascii(xl_sheet, row_idx, int(pos)) #zygosity to match
         if zyg =='.':  #If the zygosity cannot be assessed, it is disregarded
@@ -98,9 +102,9 @@ def find_shared(zygosity_positions, xl_sheet, row_idx, above_t):
                 continue
             if zyg == 'oth':
                 other = True
-                count+=1 #Keep track of how many oth
+                
         
-    if count != len(share_pos) and other == True: #If all that should share are not oth
+    if other == True: #If oth is True, the variant is not shared
         shared = False
     if wt == True and hom == True: #If both hom and wt is true, the variant is not shared
         shared = False
@@ -130,8 +134,6 @@ def not_shared(not_share_pos, wt, hom, other, shared, above_t, xl_sheet, row_idx
             if zyg == "hom": #If the variant is hom, the MAF should be above the threshold
                 if hom == True or above_t == False:
                     shared = False 
-            if other == True and zyg =='oth':
-                shared = False
                 
     return(shared)
 
@@ -177,7 +179,7 @@ def filter_sheet(workbook_r, name, ref_dbs, zygosity_positions):
             else:
                 continue
 
-    workbook_w.save('shared_'+name[0])
+    workbook_w.save('shared_'+name+'.xlsx')
 
     return None
 
@@ -218,7 +220,7 @@ else:
     zygosity_positions = text_to_list(args.zygosity_positions[0])
     
     #Perform the filtering
-    name = str(args.workbook_r[0]).split('/')[-1:] #name is only the last part of path
+    name = args.out_name[0]
                                             #name is a list here
     filter_sheet(workbook_r, name, ref_dbs, zygosity_positions)
 
