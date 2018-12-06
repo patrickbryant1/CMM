@@ -64,78 +64,121 @@ def encode_ascii(xl_sheet, row_idx, col_idx):
     '''
     cell_value = str(xl_sheet.cell(row_idx, col_idx).value).encode('ascii','ignore')
     return cell_value
-    
-def find_shared(zygosity_positions, xl_sheet, row_idx, above_t):
-    '''Finds the variants shared between the samples as specified by zygosity_positions
-        Input = zygosity_positions, xl_sheet, row_idx, above_t
-        Output = shared (bool)
+
+def get_zygosity_positions(zygosity_positions):
+    '''A function that organizes zygosity positions according to families
     '''
-    
+
     share_pos = [] #List to store colummn positions for those that should share
     not_share_pos = [] #List to store colummn positions for those that should not share
-    shared = True #See if the variants are shared
+    share_families= [] #List to store found family numbers
+    not_share_families = []
 
     #Get positions for zygosities
-    #Unnecessary to do this every time
     for item in zygosity_positions:
         item = item.split(' ') #split on space
-        if item[2] == '1':
-            share_pos.append(item[1])  #get column position
-        else:
-            not_share_pos.append(item[1])
-
-    wt = False #Keep track of wt
-    hom = False #Keep track of hom
-    other = False #Keeep track of other
-   
-    for pos in share_pos:
-        zyg = encode_ascii(xl_sheet, row_idx, int(pos)) #zygosity to match
-        if zyg =='.':  #If the zygosity cannot be assessed, it is disregarded
-            shared = False            
-            break   
-        else:
-            if zyg == "wt" or not zyg: #If the zyg is empty, it is wt
-                wt = True
-            if zyg == "hom":
-                hom = True
-            if zyg == "het":
-                continue
-            if zyg == 'oth':
-                other = True
-                
+        family_number = item[0].split('-')[0] #Get family number
         
-    if other == True: #If oth is True, the variant is not shared
-        shared = False
-    if wt == True and hom == True: #If both hom and wt is true, the variant is not shared
-        shared = False
-    if wt == True and above_t == False: #If the variant is wt, the MAF should be above the threshold
-        shared = False
-    if hom == True and above_t == True: #If the variant is hom, the MAF should be below the threshold
-        shared = False
+        if item[2] == '1': #If it is a share item
+            if family_number in share_families:
+                for i in range(0, len(share_pos)):
+                    if share_pos[i][0].split('/')[0] == family_number:
+                        share_pos[i].append(family_number+'/'+item[1]) 
+                        break
+            else:
+                share_families.append(family_number)
+                share_pos.append([family_number+'/'+item[1]])
 
+        if item[2] == '0': #If it is a not share item
+            if family_number in not_share_families:
+                for i in range(0, len(not_share_pos)):
+                    if not_share_pos[i][0].split('/')[0] == family_number:
+                        not_share_pos[i].append(family_number+'/'+item[1]) 
+                        break
+            else:
+                not_share_families.append(family_number)
+                not_share_pos.append([family_number+'/'+item[1]])
+
+    return(share_pos, not_share_pos)
+
+def find_shared(share_pos, not_share_pos, sheet_r, row_idx, above_t):
+    '''Finds the variants shared between the samples as specified by share_pos and not_share_pos
+        Input = share_pos, not_share_pos, sheet_r, row_idx, above_t
+        Output = shared (bool)
+    '''
+   
+    
+    shared_families = [] #Keep track of families that share
+    shared = False #See if the variants are shared
+   
+    for family in share_pos:
+        n_share = 0 #Keep track of how many that share
+        
+        for individual in family:
+            pos = individual.split('/')[1] #Get column position
+            zyg = encode_ascii(sheet_r, row_idx, int(pos)) #zygosity to match
+            if zyg =='.':  #If the zygosity cannot be assessed, it is disregarded            
+                break   
+            else:
+                if zyg == 'other': #If it is other, it is another variant
+                    break
+                if above_t == True:
+                    if zyg == "wt" or not zyg or zyg == 'het': #If the zyg is empty, it is wt
+                        n_share +=1
+                else: #If above_t == False
+                    if zyg == "hom" or zyg =='het':
+                        n_share +=1
+            
+        if n_share == len(family):
+            shared = True
+            shared_families.append(individual.split('/')[0])
+            #print encode_ascii(sheet_r, row_idx, 6)
+            #print shared_families
+
+    #Check the ones that should not share
     if shared == True and not_share_pos:
-        shared = not_shared(not_share_pos, wt, hom, other, shared, above_t, xl_sheet, row_idx)
+        found = False #Keep track of not_shared
+        for family in not_share_pos:
+            if family[0].split('/')[0] in shared_families:
+                found = not_shared(found, family, above_t, sheet_r, row_idx)
+                if found == True:
+                    break
+
+        if found == False: #If the not_share criteria are not fulfilled
+            shared = False
 
     return(shared)
             
-def not_shared(not_share_pos, wt, hom, other, shared, above_t, xl_sheet, row_idx):
-    #Check the ones that should not share
-    for pos in not_share_pos:
-        zyg = encode_ascii(xl_sheet, row_idx, int(pos)) #zygosity to match
-        if zyg =='.': #If the zygosity cannot be assessed, it is disregarded
-            shared = False
+def not_shared(found, family, above_t, sheet_r, row_idx):
+    '''Check if those that should not share do not
+    '''
+
+    
+    n_share = 0 #Keep track of how many that do not share
+
+    for individual in family:
+        pos = individual.split('/')[1]
+        zyg = encode_ascii(sheet_r, row_idx, int(pos)) #zygosity to match
+        if zyg =='.':  #If the zygosity cannot be assessed, it is disregarded            
+            break   
+        if zyg == 'het': #shared
             break
         else:
-            if zyg == 'het': #If the zygosity is het, they will share
-                shared = False
-            if zyg == "wt" or not zyg: #If the zyg is empty it is wt
-                if wt == True or above_t == True: #If the variant is wt, the MAF should be below the threshold
-                    shared = False
-            if zyg == "hom": #If the variant is hom, the MAF should be above the threshold
-                if hom == True or above_t == False:
-                    shared = False 
+            if zyg == 'other': #If it is other - that should be fine, right?! Can't exclude these
+                n_share+=1
                 
-    return(shared)
+            if above_t == False:
+                if zyg == "wt" or not zyg: #If the zyg is empty, it is wt
+                    n_share +=1
+            if above_t == True:
+                if zyg == "hom":
+                    n_share +=1
+
+
+    if n_share == len(family):
+        found = True
+                
+    return(found)
 
 def filter_sheet(workbook_r, name, ref_dbs, zygosity_positions):        
     '''A function that takes an xl-sheet
@@ -143,11 +186,15 @@ def filter_sheet(workbook_r, name, ref_dbs, zygosity_positions):
     Input: workbook_r, name, ref_dbs, zygosity_positions
     Output: None
     '''
-    
+    #Order zygosity positions
+    (share_pos, not_share_pos) = get_zygosity_positions(zygosity_positions)
+    print share_pos
+    print not_share_pos
+
     #Create an excel workbook and a sheet to write to
     workbook_w = openpyxl.Workbook()
     sheet_w = workbook_w.active #Get active sheet
-    sheet_w.title = 'maf_filtered'
+    sheet_w.title = 'filtered'
 
     shared = False
 
@@ -159,10 +206,11 @@ def filter_sheet(workbook_r, name, ref_dbs, zygosity_positions):
         #transfer first row
         write_to_sheet(row_idx, sheet_w, sheet_r, row_n)
 
+        
 
         for row_idx in range(1, sheet_r.nrows):
             above_t = False
- 	    for ref_db in ref_dbs:
+            for ref_db in ref_dbs:
                 ref_db = ref_db.split(' ') #split each list item on space
                 MAF = encode_ascii(sheet_r, row_idx, int(ref_db[1]))#filter on reference databases MAFs
                 if MAF and MAF != '.': #Checks if MAF is empty or NA
@@ -170,7 +218,7 @@ def filter_sheet(workbook_r, name, ref_dbs, zygosity_positions):
                     if MAF > float(ref_db[3]): #Filtering on MAF above threshold
                         above_t = True
             
-            shared = find_shared(zygosity_positions, sheet_r, row_idx, above_t)
+            shared = find_shared(share_pos, not_share_pos, sheet_r, row_idx, above_t)
             if shared == True:
                 
                     row_n += 1
